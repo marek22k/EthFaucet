@@ -140,19 +140,27 @@ CONTRACT_ABI = <<ABI
 ]
 ABI
 
-class EthNetwork
-  
-  def initialize rpc
-    @rpc_client = Ethereum::HttpClient.new(rpc)
-    @rpc_client.gas_price = @rpc_client.eth_gas_price["result"].to_i(16)
-  end
-  
-  def get_balance_of addr
-    @rpc_client.get_balance(addr)/1.0/(10**18)
-  end
-  
+CONTRACT_ADDRESS = "0xf1234DA990786218a9deDa7189Af65EED5585CBd"
+
+
+rpc_client = Ethereum::HttpClient.new("https://ropsten.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161")
+rpc_client.gas_price = rpc_client.eth_gas_price["result"].to_i(16)
+
+
+def get_balance_of rpc_client, addr
+  rpc_client.get_balance(addr)/1.0/(10**18)
 end
 
-net = EthNetwork.new "https://ropsten.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+key = Eth::Key.decrypt File.read('../priv/key.json'), "p455w0rD"
+#puts "Server balance: #{get_balance_of rpc_client, key.address}"
+#puts "Faucet balance: #{get_balance_of rpc_client, CONTRACT_ADDRESS}"
 
-key = Eth::Key.decrypt File.read('./some/path.json'), 'p455w0rD'
+faucet = Ethereum::Contract.create(client: rpc_client, name: "Faucet", address: CONTRACT_ADDRESS, abi: CONTRACT_ABI)
+faucet.key = key
+
+if faucet.call.is_friend_blacklisted(ARGV[0])
+  puts "blacklisted"
+else
+  puts faucet.transact.request_faucet_for(ARGV[0]).id
+end
+
